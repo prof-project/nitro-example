@@ -2,10 +2,10 @@ FROM golang:1.22-alpine
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY grpc-nitro-enclave/go.mod grpc-nitro-enclave/go.sum ./
 RUN go mod download
 
-COPY . .
+COPY grpc-nitro-enclave/. .
 
 RUN go build -o /enclave-server server.go
 

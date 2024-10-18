@@ -70,6 +70,7 @@ protoc --go_out=paths=source_relative:. --go-grpc_out=paths=source_relative:. pr
 
 - Build the docker image
 ```
+cd grpc-nitro-enclave/
 sudo docker build -t grpc-nitro-enclave .
 ```
 
