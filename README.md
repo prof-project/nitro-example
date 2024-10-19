@@ -68,31 +68,14 @@ go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
 protoc --go_out=paths=source_relative:. --go-grpc_out=paths=source_relative:. proto/echo.proto
 ```
 
-- Build the docker image
+- Build the docker image, Build the enclave image, Run the enclave and Check the enclave terminal
 ```
-cd grpc-nitro-enclave/
-sudo docker build -t grpc-nitro-enclave .
-```
-
-- Build the enclave image
-```
-sudo nitro-cli build-enclave --docker-uri grpc-nitro-enclave --output-file grpc-nitro-enclave.eif
+make connect-rebuild-enclave
 ```
 
-- Run the enclave
+Now, build and run the client. For this, we need to run Socat to Forward TCP to VSOCK. In a new terminal, run:
 ```
-sudo nitro-cli run-enclave --eif-path grpc-nitro-enclave.eif --memory 2000 --cpu-count 2 --enclave-cid 16 --debug-mode
-```
-
-- Check the enclave terminal
-```
-sudo nitro-cli console --enclave-id <enclave-id>
-```
-
-Now, one needs to run the client. For this, we need to run Socat to Forward TCP to VSOCK
-
-```
-sudo socat TCP-LISTEN:50051,reuseaddr,fork VSOCK-CONNECT:16:50051
+make socat-run
 ```
 
 - Build the client
@@ -102,14 +85,17 @@ go build -o client client.go
 
 - Run the client
 ```
-./client "Hello from outside the enclave!"
+make client-run
 ```
 
-- Expected Output in the enclave terminal: `2024/10/11 10:37:29 Received: Hello from outside the enclave!`
+- Expected Output in the enclave terminal: `Received: Hello from outside the enclave!`
 - Expected Output in the client terminal: 
 ```
-2024/10/11 10:41:08 Server response: Echo: Hello from outside the enclave!
-2024/10/11 10:41:08 Round-trip time: 3.991322ms
+2024/10/19 10:11:44 Attestation document fields validated
+2024/10/19 10:11:44 COSE signature verified successfully!
+2024/10/19 10:11:44 Attestation document verified successfully
+2024/10/19 10:11:44 Server response: Echo: Hello from client!
+2024/10/19 10:11:44 Round-trip time: 4.32597ms
 ```
 
 ## Security
