@@ -38,16 +38,6 @@ type AttestationDocument struct {
 	Nonce       []byte         `cbor:"nonce,omitempty"`
 }
 
-// mapAttestationData represents the COSE_Sign1 message structure.
-type mapAttestationData struct {
-    _ struct{} `cbor:",toarray"` // Instructs CBOR to treat this struct as an array
-
-    ProtectedData   []byte                 `cbor:"0"` // Protected header
-    UnprotectedData map[string]interface{} `cbor:"1"` // Unprotected header
-    Payload         []byte                 `cbor:"2"` // Payload
-    Signature       []byte                 `cbor:"3"` // Signature
-}
-
 func main() {
     // Set up a connection to the server.
     conn, err := grpc.Dial(address, grpc.WithInsecure())
@@ -145,7 +135,7 @@ func downloadAndVerifyRootCert(url, expectedHash string) ([]byte, error) {
 
     // Construct the file path
     zipFilePath := fmt.Sprintf("%s/AWS_NitroEnclaves_Root-G1.zip", cwd)
-    
+
     // Save zip file temporarily
     err = os.WriteFile(zipFilePath, zipData, 0644)
     if err != nil {
