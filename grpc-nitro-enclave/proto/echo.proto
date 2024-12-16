@@ -14,4 +14,5 @@ message EchoRequest {
 
 message EchoResponse {
     string message = 1;
+    bytes attestation_document = 2; // Add attestation document to the response
 }

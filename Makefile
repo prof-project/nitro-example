@@ -34,4 +34,5 @@ socat-run:
 	sudo socat -d -d TCP-LISTEN:50051,reuseaddr,fork VSOCK-CONNECT:16:50051
 
 client-run:
+	go build -o client client.go
 	sudo ./grpc-nitro-enclave/client "Hello from outside the enclave!"

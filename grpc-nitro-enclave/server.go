@@ -3,15 +3,15 @@ package main
 import (
     "context"
     "log"
+    "fmt"
     "encoding/base64"
-	"errors"
 
     "github.com/mdlayher/vsock"
     "google.golang.org/grpc"
     pb "github.com/prof-project/nitro-example/grpc-nitro-enclave/proto"
-    
+
     "github.com/hf/nsm"
-	"github.com/hf/nsm/request"
+    "github.com/hf/nsm/request"
 )
 
 const (
@@ -20,30 +20,26 @@ const (
 
 type server struct {
     pb.UnimplementedEchoServiceServer
+    attestationDocument []byte
 }
 
 func (s *server) Echo(ctx context.Context, in *pb.EchoRequest) (*pb.EchoResponse, error) {
     log.Printf("Received: %v", in.GetMessage())
-    return &pb.EchoResponse{Message: "Echo: " + in.GetMessage()}, nil
+    // Include the attestation document in the response
+    return &pb.EchoResponse{
+        Message:             "Echo: " + in.GetMessage(),
+        AttestationDocument: s.attestationDocument,
+    }, nil
 }
 
 func main() {
+    // Obtain the attestation document
+    attestationDoc, err := attest(nil, nil, nil)
+    if err != nil {
+        log.Fatalf("Failed to obtain attestation document: %v", err)
+    }
 
-    // User data can be used as part of a challenge-response authentication mechanism. 
-    // For example, when a remote service requests attestation from an enclave, 
-    // the service might want to ensure that the attestation request is fresh and hasn’t
-    // been reused. By including custom user data (e.g., a unique identifier, request 
-    // parameters, etc.), the service can tie the attestation to a specific session 
-    // or interaction.
-
-    att, err :=
-		attest(
-			[]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
-			[]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
-			[]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
-		)
-
-	log.Printf("attestation %v %v\n", base64.StdEncoding.EncodeToString(att), err)
+    log.Printf("Attestation Document (base64): %v\n", base64.StdEncoding.EncodeToString(attestationDoc))
 
     // Create a vsock listener
     listener, err := vsock.Listen(uint32(port), &vsock.Config{})
@@ -51,38 +47,38 @@ func main() {
         log.Fatalf("failed to listen: %v", err)
     }
     s := grpc.NewServer()
-    pb.RegisterEchoServiceServer(s, &server{})
+    // Pass the attestation document to the server implementation
+    pb.RegisterEchoServiceServer(s, &server{attestationDocument: attestationDoc})
     log.Printf("Server listening on vsock port %d", port)
     if err := s.Serve(listener); err != nil {
         log.Fatalf("failed to serve: %v", err)
     }
 }
 
-// Uses AWS nsm to obtain an attestation document
+// Uses AWS NSM to obtain an attestation document
 func attest(nonce, userData, publicKey []byte) ([]byte, error) {
-	sess, err := nsm.OpenDefaultSession()
-	defer sess.Close()
+    sess, err := nsm.OpenDefaultSession()
+    if err != nil {
+        return nil, err
+    }
+    defer sess.Close()
 
-	if nil != err {
-		return nil, err
-	}
+    res, err := sess.Send(&request.Attestation{
+        Nonce:     nonce,
+        UserData:  userData,
+        PublicKey: publicKey,
+    })
+    if err != nil {
+        return nil, err
+    }
 
-	res, err := sess.Send(&request.Attestation{
-		Nonce:     nonce,
-		UserData:  userData,
-		PublicKey: publicKey,
-	})
-	if nil != err {
-		return nil, err
-	}
+    if res.Error != "" {
+        return nil, fmt.Errorf("NSM error: %s", res.Error)
+    }
 
-	if "" != res.Error {
-		return nil, errors.New(string(res.Error))
-	}
+    if res.Attestation == nil || res.Attestation.Document == nil {
+        return nil, fmt.Errorf("NSM device did not return an attestation")
+    }
 
-	if nil == res.Attestation || nil == res.Attestation.Document {
-		return nil, errors.New("NSM device did not return an attestation")
-	}
-
-	return res.Attestation.Document, nil
+    return res.Attestation.Document, nil
 }
